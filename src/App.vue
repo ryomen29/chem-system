@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, nextTick, reactive } from 'vue'
+import { computed, ref, nextTick, reactive, onMounted, onBeforeUnmount } from 'vue'
 import {
   Home, BookOpen, FlaskConical, MessageSquare, BarChart2, User, Settings,
   Menu, X, Send, ChevronRight, ChevronLeft, Check, Play, Maximize2,
@@ -17,11 +17,32 @@ const route = ref({ page:'login', moduleId:'dna-genetics' })
 const authed = ref(false)
 const mobileOpen = ref(false)
 
-const nav = (page, extra={}) => {
-  route.value = { page, ...extra }
+const nav = (page, extra={}, { replace=false }={}) => {
+  const newState = { page, ...extra }
+  if (replace) window.history.replaceState(newState, '')
+  else window.history.pushState(newState, '')
+  route.value = newState
   mobileOpen.value = false
   window.scrollTo({top:0, behavior:'smooth'})
 }
+const goBack = () => {
+  window.history.back()
+}
+
+function handlePopState(e){
+  const s = e.state
+  if (s && s.page) route.value = s
+  else route.value = { page: 'dashboard' }
+  mobileOpen.value = false
+  window.scrollTo({top:0, behavior:'smooth'})
+}
+
+onMounted(()=>{
+  // initialize browser history entry for current route
+  window.history.replaceState(route.value, '')
+  window.addEventListener('popstate', handlePopState)
+})
+onBeforeUnmount(()=>window.removeEventListener('popstate', handlePopState))
 const authNav = page => {
   if (page === 'dashboard') { authed.value=true; route.value={page} }
   else route.value={page}
@@ -213,7 +234,7 @@ function toggleSubject(s){
 
       <!-- MODULE DETAIL -->
       <section v-else-if="route.page==='module-detail'" class="page">
-        <button class="back-btn" @click="nav('modules')"><ChevronLeft :size="16"/> All modules</button>
+        <button class="back-btn" @click="goBack()"><ChevronLeft :size="16"/> All modules</button>
         <div class="module-hero">
           <div><SubjectBadge :subject="selectedModule.subject"/><h1>{{selectedModule.title}}</h1><p>{{selectedModule.description}}</p><div class="module-meta"><span><BookOpen :size="15"/> {{selectedModule.lessons}} lessons</span><span><Clock :size="15"/> {{selectedModule.hours}} hours</span><span><Activity :size="15"/> {{selectedModule.difficulty}}</span></div></div>
           <div class="detail-progress"><ProgressRing :pct="selectedModule.progress" :size="110" :sw="9" :color="subjectColor(selectedModule.subject)"/><b>{{selectedModule.progress}}%</b><small>Complete</small></div>
@@ -224,7 +245,7 @@ function toggleSubject(s){
 
       <!-- LESSON -->
       <section v-else-if="route.page==='lesson'" class="page lesson-page">
-        <button class="back-btn" @click="nav('module-detail',{moduleId:'dna-genetics'})"><ChevronLeft :size="16"/> Back to DNA & Genetics</button>
+        <button class="back-btn" @click="goBack()"><ChevronLeft :size="16"/> Back to DNA & Genetics</button>
         <div class="lesson-header"><div><SubjectBadge subject="Biology"/><h1>Genes & Traits</h1><p>How genes influence the traits of living organisms.</p></div><span class="duration"><Clock :size="15"/> 25 min</span></div>
         <div class="lesson-content"><article class="article panel"><div class="article-label">LESSON 03 · READING</div><h2>Genes are the instructions of life</h2><p>Every living cell contains DNA, a molecule that stores the information needed to build and maintain an organism. Within DNA are <strong>genes</strong> — specific segments that carry instructions for making proteins and regulating biological processes.</p><div class="science-callout"><Dna :size="22"/><div><b>Think of a gene like a recipe</b><p>A recipe tells you which ingredients to use and how to combine them. A gene contains instructions that help a cell make a particular protein.</p></div></div><h3>Genes and traits</h3><p>A <strong>trait</strong> is a characteristic of an organism, such as eye color, height, or blood type. Genes influence traits by providing instructions for proteins that affect how cells work.</p><div class="trait-diagram"><div class="dna-visual">A T<br>G C<br>A T<br>C G<br>T A</div><div class="arrow-big">→</div><div class="protein-visual">Protein<br><span>function</span></div><div class="arrow-big">→</div><div class="trait-visual">Trait<br><span>characteristic</span></div></div><h3>Key takeaway</h3><p>Genes are segments of DNA that contain biological instructions. Different versions of genes can contribute to differences in traits among individuals.</p></article>
           <aside class="lesson-side"><div class="panel"><h3>Lesson progress</h3><div class="mini-progress"><span>3</span><div><b>3 of 6</b><small>lessons completed</small></div></div><PBar :pct="50" color="#2c7a50"/></div><div class="panel"><h3>Up next</h3><div class="next-item"><FlaskConical :size="17"/><div><b>Interactive Experiment</b><small>30 min · Simulation</small></div><ChevronRight :size="15"/></div></div><button class="primary-btn wide" @click="nav('simulation')">Start experiment <Play :size="15"/></button></aside>
@@ -252,7 +273,7 @@ function toggleSubject(s){
 
       <!-- QUIZ -->
       <section v-else-if="route.page==='quiz'" class="page quiz-page">
-        <div class="quiz-top"><button class="back-btn" @click="nav('module-detail',{moduleId:'dna-genetics'})"><ChevronLeft :size="16"/> Exit quiz</button><span>Question {{quizIndex+1}} of {{QUIZ.length}}</span></div><PBar :pct="((quizIndex)/QUIZ.length)*100" color="#2c7a50" h="6"/>
+        <div class="quiz-top"><button class="back-btn" @click="goBack()"><ChevronLeft :size="16"/> Exit quiz</button><span>Question {{quizIndex+1}} of {{QUIZ.length}}</span></div><PBar :pct="((quizIndex)/QUIZ.length)*100" color="#2c7a50" h="6"/>
         <div class="quiz-card panel"><div class="quiz-label">DNA & GENETICS · FINAL QUIZ</div><h1>{{QUIZ[quizIndex].question}}</h1><div class="options"><button v-for="(o,i) in QUIZ[quizIndex].options" :key="o" class="option" :class="{selected:quizAnswers[quizIndex]===i,correct:quizSubmitted&&i===QUIZ[quizIndex].correct,wrong:quizSubmitted&&quizAnswers[quizIndex]===i&&i!==QUIZ[quizIndex].correct}" @click="chooseAnswer(i)"><span>{{String.fromCharCode(65+i)}}</span><b>{{o}}</b><CheckCircle v-if="quizSubmitted&&i===QUIZ[quizIndex].correct" :size="18"/><XCircle v-else-if="quizSubmitted&&quizAnswers[quizIndex]===i" :size="18"/></button></div><div v-if="quizSubmitted" class="explanation"><Sparkles :size="17"/><div><b>Explanation</b><p>{{QUIZ[quizIndex].explanation}}</p></div></div><div class="quiz-actions"><span v-if="quizAnswers[quizIndex]!==undefined">Answer selected</span><button class="primary-btn" :disabled="quizAnswers[quizIndex]===undefined" @click="nextQuestion">{{quizIndex===QUIZ.length-1?'Finish quiz':'Next question'}} <ChevronRight :size="15"/></button></div></div>
       </section>
 
